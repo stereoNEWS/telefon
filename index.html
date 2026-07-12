@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gyro 3D Cube Sync</title>
+    <!-- Библиотека для P2P соединения -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- Библиотека для создания QR-кода -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Экраны (по умолчанию скрыты) */
+        #pc-view, #mobile-view { display: none; flex-direction: column; align-items: center; }
+
+        /* Стиль QR кода */
+        #qrcode-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        /* 3D Сцена на ПК */
+        #cube-container {
+            display: none;
+            perspective: 800px;
+        }
+        
+        #cube {
+            width: 200px;
+            height: 200px;
+            position: relative;
+            transform-style: preserve-3d;
+            /* Убираем плавность transition, чтобы реакция была в 1мс (моментально) */
+        }
+
+        /* Грани 3D кубика */
+        .face {
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            background: rgba(0, 255, 128, 0.7);
+            border: 3px solid #00ff80;
+            box-shadow: 0 0 20px rgba(0, 255, 128, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .front  { transform: translateZ(100px); }
+        .back   { transform: rotateY(180deg) translateZ(100px); }
+        .right  { transform: rotateY(90deg) translateZ(100px); }
+        .left   { transform: rotateY(-90deg) translateZ(100px); }
+        .top    { transform: rotateX(90deg) translateZ(100px); }
+        .bottom { transform: rotateX(-90deg) translateZ(100px); }
+
+        /* Интерфейс телефона */
+        button {
+            padding: 20px 40px;
+            font-size: 24px;
+            background-color: #00ff80;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0,255,128,0.4);
+        }
+        button:active { transform: scale(0.95); }
+        #status { margin-bottom: 20px; font-size: 18px; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <!-- ЭКРАН ДЛЯ ПК -->
+    <div id="pc-view">
+        <div id="qrcode-container">
+            <h2 style="color: black; margin-top: 0; text-align: center;">Отсканируй с телефона</h2>
+            <div id="qrcode"></div>
+        </div>
+        
+        <div id="cube-container">
+            <div id="cube">
+                <div class="face front">FRONT</div>
+                <div class="face back">BACK</div>
+                <div class="face right">RIGHT</div>
+                <div class="face left">LEFT</div>
+                <div class="face top">TOP</div>
+                <div class="face bottom">BOTTOM</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ЭКРАН ДЛЯ ТЕЛЕФОНА -->
+    <div id="mobile-view">
+        <div id="status">Подключение к ПК...</div>
+        <button id="start-btn" style="display: none;">Запустить гироскоп</button>
+    </div>
+
+    <script>
+        // Проверяем, есть ли ID в ссылке
+        const urlParams = new URLSearchParams(window.location.search);
+        const peerId = urlParams.get('id');
+
+        if (!peerId) {
+            // === ЛОГИКА ДЛЯ КОМПЬЮТЕРА ===
+            document.getElementById('pc-view').style.display = 'flex';
+            
+            // Создаем серверную комнату
+            const peer = new Peer();
+            
+            peer.on('open', (id) => {
+                // Генерируем ссылку для телефона и делаем QR-код
+                const mobileUrl = window.location.href.split('?')[0] + '?id=' + id;
+                new QRCode(document.getElementById("qrcode"), {
+                    text: mobileUrl,
+                    width: 250,
+                    height: 250
+                });
+            });
+
+            // Ждем подключения от телефона
+            peer.on('connection', (conn) => {
+                document.getElementById('qrcode-container').style.display = 'none';
+                document.getElementById('cube-container').style.display = 'flex';
+                
+                // Как только приходят данные, моментально крутим куб
+                conn.on('data', (data) => {
+                    const cube = document.getElementById('cube');
+                    // Оси гироскопа на телефоне: beta (вперед-назад), gamma (влево-вправо), alpha (по компасу)
+                    cube.style.transform = `rotateX(${data.beta - 90}deg) rotateY(${-data.gamma}deg) rotateZ(${-data.alpha}deg)`;
+                });
+            });
+
+        } else {
+            // === ЛОГИКА ДЛЯ ТЕЛЕФОНА ===
+            document.getElementById('mobile-view').style.display = 'flex';
+            const statusText = document.getElementById('status');
+            const startBtn = document.getElementById('start-btn');
+            
+            const peer = new Peer();
+            let conn;
+
+            peer.on('open', () => {
+                // Подключаемся к ПК по ID из QR-кода
+                conn = peer.connect(peerId);
+                
+                conn.on('open', () => {
+                    statusText.innerText = 'Успешно соединено!\nНажми кнопку, чтобы дать доступ к датчикам.';
+                    startBtn.style.display = 'block';
+                });
+            });
+
+            // На современных телефонах (особенно iOS) доступ к гироскопу выдается только по клику кнопки!
+            startBtn.addEventListener('click', () => {
+                if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    // Для iOS 13+
+                    DeviceOrientationEvent.requestPermission()
+                        .then(permissionState => {
+                            if (permissionState === 'granted') {
+                                window.addEventListener('deviceorientation', sendOrientation);
+                                startBtn.innerText = 'Датчик работает 🚀';
+                            } else {
+                                statusText.innerText = 'Доступ к датчику запрещен.';
+                            }
+                        })
+                        .catch(console.error);
+                } else {
+                    // Для Android и старых iOS
+                    window.addEventListener('deviceorientation', sendOrientation);
+                    startBtn.innerText = 'Датчик работает 🚀';
+                }
+            });
+
+            // Отправка данных на ПК при любом наклоне телефона
+            function sendOrientation(event) {
+                if (conn && conn.open) {
+                    conn.send({
+                        alpha: event.alpha || 0,
+                        beta: event.beta || 0,
+                        gamma: event.gamma || 0
+                    });
+                }
+            }
+        }
+    </script>
+</body>
+</html>
