@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Gyro Sync</title>
+    <title>3D Gyro Sync: Проверка Связи</title>
     
     <!-- Подключаем библиотеки -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -11,99 +11,66 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #050507;
-            color: #fff;
-            font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
-        }
+        body { margin: 0; overflow: hidden; background-color: #050507; color: #fff; font-family: 'Segoe UI', Roboto, Helvetica, sans-serif; }
 
-        #pc-ui {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            padding: 40px;
-            border-radius: 24px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-            transition: opacity 0.5s ease;
-            z-index: 10;
-            text-align: center;
+        #pc-ui, #pc-active {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            display: flex; flex-direction: column; align-items: center; text-align: center;
+            background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px);
+            padding: 40px; border-radius: 24px; border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5); transition: opacity 0.5s ease; z-index: 10;
         }
+        
+        #pc-active { display: none; opacity: 0; background: rgba(0, 255, 170, 0.05); border-color: rgba(0, 255, 170, 0.3); }
 
-        #qrcode {
-            background: white;
-            padding: 15px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            min-width: 200px;
-            min-height: 200px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: #000;
-            font-weight: bold;
-        }
+        #qrcode { background: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; min-width: 200px; min-height: 200px; display: flex; justify-content: center; align-items: center; color: #000; font-weight: bold; }
 
         h1 { margin: 0 0 10px 0; font-size: 24px; }
         p { margin: 0; color: #aaa; font-size: 14px; }
+        .green { color: #00ffaa; font-weight: bold; font-size: 18px; margin-top: 15px; }
 
-        #status {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            font-size: 14px;
-            color: #00ffaa;
-            z-index: 10;
-            display: none;
-            letter-spacing: 2px;
-        }
+        /* Декоративная сетка на фоне */
+        #bg-grid { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; opacity: 0.2; }
 
         #phone-ui {
-            display: none;
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-            z-index: 20;
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            flex-direction: column; justify-content: center; align-items: center;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); z-index: 20;
         }
 
         .btn {
-            background: #00ffaa;
-            color: #000;
-            border: none;
-            padding: 20px 40px;
-            font-size: 18px;
-            font-weight: bold;
-            border-radius: 50px;
-            box-shadow: 0 10px 30px rgba(0, 255, 170, 0.4);
-            cursor: pointer;
+            background: #00ffaa; color: #000; border: none; padding: 20px 40px;
+            font-size: 18px; font-weight: bold; border-radius: 50px;
+            box-shadow: 0 10px 30px rgba(0, 255, 170, 0.4); cursor: pointer;
+            transition: all 0.2s ease; text-transform: uppercase; letter-spacing: 2px;
         }
+        .btn:active { transform: scale(0.96) translateY(2px); }
+        .btn:disabled { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.5); cursor: not-allowed; box-shadow: none; }
 
-        #phone-status { margin-top: 20px; font-size: 16px; color: rgba(255,255,255,0.7); }
+        #phone-status { margin-top: 20px; font-size: 16px; color: rgba(255,255,255,0.7); font-weight: 300; letter-spacing: 1px;}
+        #phone-status strong { color: #fff; font-weight: bold; }
     </style>
 </head>
 <body>
+    <div id="bg-grid"></div>
 
+    <!-- UI ПК -->
     <div id="pc-ui">
         <div id="qrcode">⏳ Соединение с сервером...</div>
         <h1>Отсканируйте код</h1>
-        <p>Используйте камеру телефона для подключения</p>
+        <p>Для генерации QR-кода может потребоваться ВПН.</p>
     </div>
-    <div id="status">● Подключено (WebRTC P2P)</div>
+    
+    <div id="pc-active">
+        <h1>Связь установлена!</h1>
+        <p>Двигайте телефон, чтобы управлять кубом</p>
+        <div id="p2p-status" class="green">○ Идет двунаправленное рукопожатие...</div>
+    </div>
 
+    <!-- UI Телефона -->
     <div id="phone-ui">
-        <button class="btn" id="start-btn">Подключить гироскоп</button>
-        <div id="phone-status">Ожидание...</div>
+        <button class="btn" id="start-btn" disabled>Сначала нажмите 'Соединиться'</button>
+        <div id="phone-status">Статус: <strong>Установка сети P2P...</strong></div>
     </div>
 
     <script>
@@ -111,103 +78,84 @@
         const peerIdToConnect = urlParams.get('peer');
         const isPhone = peerIdToConnect !== null;
 
-        // Создаем соединение (используем надежный бесплатный сервер по умолчанию)
-        const peer = new Peer({
-            debug: 2
-        });
+        // Создаем PeerJS с более детальной отладкой
+        const peer = new Peer({ debug: 2 });
 
         if (!isPhone) {
-            let cube, scene, camera, renderer;
+            // ======================== ПК РЕЖИМ ========================
+            const qrcodeEl = document.getElementById("qrcode");
+            const pcUi = document.getElementById('pc-ui');
+            const pcActiveUi = document.getElementById('pc-active');
+            const p2pStatusEl = document.getElementById('p2p-status');
+            const gridEl = document.getElementById('bg-grid');
+            let cube, scene, camera, renderer, connection;
             let targetQuaternion = new THREE.Quaternion();
 
+            // Фоновая сетка для стиля
+            new QRCode(gridEl, { text: "GYRO_SYNC_P2P", width: window.innerWidth, height: window.innerHeight });
+
+            // 3D Сцена
             function init3D() {
                 scene = new THREE.Scene();
                 camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
                 camera.position.z = 6;
-
                 renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
                 renderer.setSize(window.innerWidth, window.innerHeight);
                 renderer.setPixelRatio(window.devicePixelRatio);
                 document.body.appendChild(renderer.domElement);
-
-                const geometry = new THREE.BoxGeometry(2, 2, 2);
-                const material = new THREE.MeshPhysicalMaterial({
-                    color: 0x111111, metalness: 0.9, roughness: 0.1, 
-                    clearcoat: 1.0, emissive: 0x00ffaa, emissiveIntensity: 0.1
-                });
-
-                cube = new THREE.Mesh(geometry, material);
+                cube = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshPhysicalMaterial({ color: 0x111111, metalness: 0.9, roughness: 0.1, clearcoat: 1.0, emissive: 0x00ffaa, emissiveIntensity: 0.1 }));
                 scene.add(cube);
-
                 scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-                
-                const light1 = new THREE.PointLight(0x00ffaa, 2, 50);
-                light1.position.set(5, 5, 5);
-                scene.add(light1);
-
-                const light2 = new THREE.PointLight(0xff0055, 2, 50);
-                light2.position.set(-5, -5, 5);
-                scene.add(light2);
-
-                const grid = new THREE.GridHelper(20, 20, 0x00ffaa, 0x222222);
-                grid.position.y = -2;
-                grid.material.opacity = 0.2;
-                grid.material.transparent = true;
-                scene.add(grid);
-
+                const light1 = new THREE.PointLight(0x00ffaa, 2, 50); light1.position.set(5, 5, 5); scene.add(light1);
+                const grid = new THREE.GridHelper(20, 20, 0x00ffaa, 0x222222); grid.position.y = -2; grid.material.opacity = 0.2; grid.material.transparent = true; scene.add(grid);
                 animate();
             }
 
-            function animate() {
-                requestAnimationFrame(animate);
-                if (cube) cube.quaternion.slerp(targetQuaternion, 0.15); 
-                renderer.render(scene, camera);
-            }
+            function animate() { requestAnimationFrame(animate); if (cube) cube.quaternion.slerp(targetQuaternion, 0.15); renderer.render(scene, camera); }
+            window.addEventListener('resize', () => { if(camera && renderer) { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }});
 
-            window.addEventListener('resize', () => {
-                if(camera && renderer) {
-                    camera.aspect = window.innerWidth / window.innerHeight;
-                    camera.updateProjectionMatrix();
-                    renderer.setSize(window.innerWidth, window.innerHeight);
-                }
-            });
-
-            const qrcodeEl = document.getElementById("qrcode");
-
-            // ОШИБКА СЕРВЕРА
+            // Сетевая часть ПК
             peer.on('error', (err) => {
-                console.error(err);
-                qrcodeEl.innerHTML = `<span style="color: red; text-align: center;">Ошибка сети!<br>Попробуй выключить AdBlock или обновить страницу.</span>`;
+                console.error("Ошибка PeerJS на ПК:", err);
+                if (err.type === 'network') qrcodeEl.innerHTML = `<span style="color: red;">Ошибка сети!<br>Вам 100% нужен ВПН на ПК!</span>`;
+                else qrcodeEl.innerHTML = `<span style="color: red;">Ошибка: ${err.type}</span>`;
             });
 
-            // УСПЕШНОЕ ПОДКЛЮЧЕНИЕ
             peer.on('open', (id) => {
-                qrcodeEl.innerHTML = ""; // Убираем текст загрузки
+                qrcodeEl.innerHTML = "";
                 const connectUrl = window.location.href.split('?')[0] + '?peer=' + id;
-                
                 try {
-                    new QRCode(qrcodeEl, {
-                        text: connectUrl,
-                        width: 200,
-                        height: 200,
-                        colorDark : "#000000",
-                        colorLight : "#ffffff",
-                        correctLevel : QRCode.CorrectLevel.H
-                    });
+                    new QRCode(qrcodeEl, { text: connectUrl, width: 200, height: 200, colorDark : "#000000", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H });
                     init3D();
-                } catch(e) {
-                    qrcodeEl.innerHTML = `<span style="color: red;">Ошибка QR-генератора!</span>`;
-                }
+                } catch(e) { qrcodeEl.innerHTML = `<span style="color: red;">Ошибка QR!</span>`; }
             });
 
+            // Продвинутое рукопожатие на ПК
             peer.on('connection', (conn) => {
+                connection = conn;
+                
+                // Переключаем UI
+                pcUi.style.opacity = '0';
+                setTimeout(() => {
+                    pcUi.style.display = 'none';
+                    pcActiveUi.style.display = 'flex';
+                    setTimeout(() => pcActiveUi.style.opacity = '1', 50);
+                }, 500);
+
                 conn.on('open', () => {
-                    document.getElementById('pc-ui').style.opacity = '0';
-                    setTimeout(() => document.getElementById('pc-ui').style.display = 'none', 500);
-                    document.getElementById('status').style.display = 'block';
+                    p2pStatusEl.innerText = "○ Установлен p2p канал. Ожидание телефона...";
+                    console.log("DataChannel открыт на ПК.");
                 });
 
+                // Ждем сигнала готовности от телефона
                 conn.on('data', (data) => {
+                    if (data.type === 'HELLO_FROM_PHONE') {
+                        p2pStatusEl.innerText = "○ Телефон готов. Начинаю обмен данных!";
+                        // Отправляем ответ: "ПК готов, давай гироскоп!"
+                        connection.send({ type: 'PC_READY_TO_RECEIVE' });
+                        p2pStatusEl.innerText = "● Канал верифицирован. Получаю данные!";
+                    }
+
                     if (data.type === 'gyro') {
                         const alpha = THREE.MathUtils.degToRad(data.alpha || 0);
                         const beta = THREE.MathUtils.degToRad(data.beta || 0);
@@ -216,54 +164,68 @@
                         targetQuaternion.setFromEuler(euler);
                     }
                 });
+
+                conn.on('close', () => { p2pStatusEl.innerText = "X Связь потеряна."; });
+                conn.on('error', (err) => { p2pStatusEl.innerText = "X Ошибка связи."; });
             });
 
         } else {
+            // ======================== ТЕЛЕФОН РЕЖИМ ========================
             document.getElementById('phone-ui').style.display = 'flex';
-            const statusEl = document.getElementById('phone-status');
+            const statusEl = document.getElementById('phone-status').querySelector('strong');
             const btn = document.getElementById('start-btn');
-            
-            let conn;
+            let conn, pcLinked = false;
 
             peer.on('error', (err) => {
-                statusEl.innerText = "Ошибка подключения к ПК!";
-                statusEl.style.color = "red";
+                console.error("Ошибка PeerJS на Телефоне:", err);
+                statusEl.innerText = "Ошибка сети P2P!"; statusEl.style.color = "red";
             });
 
             peer.on('open', () => {
-                statusEl.innerText = "Установка связи P2P...";
-                conn = peer.connect(peerIdToConnect);
+                statusEl.innerText = "Соединение с ПК...";
+                conn = peer.connect(peerIdToConnect, {
+                    serialization: 'json',
+                    reliable: true // Включаем надежную отправку для рукопожатия
+                });
 
+                // Продвинутое рукопожатие на Телефоне
                 conn.on('open', () => {
-                    statusEl.innerText = "Связь установлена! Нажмите кнопку.";
+                    statusEl.innerText = "○ P2P канал открыт. Верификация...";
+                    // Шаг 1: Телефон отправляет "Привет" ПК
+                    conn.send({ type: 'HELLO_FROM_PHONE' });
+                });
+
+                // Слушаем ответ от ПК
+                conn.on('data', (data) => {
+                    if (data.type === 'PC_READY_TO_RECEIVE') {
+                        statusEl.innerText = "○ ПК подтвердил связь! Нажмите кнопку.";
+                        pcLinked = true;
+                        btn.disabled = false; btn.innerText = "Запустить Гироскоп";
+                        btn.style.background = "#00ffaa";
+                    }
                 });
             });
 
             btn.addEventListener('click', () => {
+                if (!pcLinked) return;
+                
+                // Запрос разрешений iOS 13+
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                     DeviceOrientationEvent.requestPermission()
-                        .then(permissionState => {
-                            if (permissionState === 'granted') startGyro();
-                            else statusEl.innerText = "Доступ к гироскопу запрещен.";
-                        })
+                        .then(permissionState => { if (permissionState === 'granted') startGyro(); else statusEl.innerText = "Нет доступа!"; })
                         .catch(console.error);
-                } else {
-                    startGyro();
-                }
+                } else { startGyro(); }
             });
 
             function startGyro() {
                 btn.style.display = 'none';
-                statusEl.innerText = "🔴 Идет передача движений...";
+                statusEl.innerText = "🔴 Идет ПРОВЕРЕННАЯ передача движений...";
                 statusEl.style.color = "#00ffaa";
 
                 window.addEventListener('deviceorientation', (event) => {
-                    if (conn && conn.open) {
+                    if (conn && conn.open && pcLinked) {
                         conn.send({
-                            type: 'gyro',
-                            alpha: event.alpha,
-                            beta: event.beta,
-                            gamma: event.gamma
+                            type: 'gyro', alpha: event.alpha, beta: event.beta, gamma: event.gamma
                         });
                     }
                 }, true);
