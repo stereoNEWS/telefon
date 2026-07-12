@@ -19,7 +19,6 @@
             font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
         }
 
-        /* UI для компьютера */
         #pc-ui {
             position: absolute;
             top: 50%;
@@ -36,6 +35,7 @@
             box-shadow: 0 20px 50px rgba(0,0,0,0.5);
             transition: opacity 0.5s ease;
             z-index: 10;
+            text-align: center;
         }
 
         #qrcode {
@@ -43,20 +43,17 @@
             padding: 15px;
             border-radius: 12px;
             margin-bottom: 20px;
+            min-width: 200px;
+            min-height: 200px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #000;
+            font-weight: bold;
         }
 
-        h1 {
-            margin: 0 0 10px 0;
-            font-size: 24px;
-            font-weight: 600;
-            letter-spacing: 1px;
-        }
-
-        p {
-            margin: 0;
-            color: #aaa;
-            font-size: 14px;
-        }
+        h1 { margin: 0 0 10px 0; font-size: 24px; }
+        p { margin: 0; color: #aaa; font-size: 14px; }
 
         #status {
             position: absolute;
@@ -66,11 +63,9 @@
             color: #00ffaa;
             z-index: 10;
             display: none;
-            text-transform: uppercase;
             letter-spacing: 2px;
         }
 
-        /* UI для телефона */
         #phone-ui {
             display: none;
             position: absolute;
@@ -92,34 +87,23 @@
             border-radius: 50px;
             box-shadow: 0 10px 30px rgba(0, 255, 170, 0.4);
             cursor: pointer;
-            transition: transform 0.2s;
         }
 
-        .btn:active {
-            transform: scale(0.95);
-        }
-
-        #phone-status {
-            margin-top: 20px;
-            font-size: 16px;
-            color: rgba(255,255,255,0.7);
-        }
+        #phone-status { margin-top: 20px; font-size: 16px; color: rgba(255,255,255,0.7); }
     </style>
 </head>
 <body>
 
-    <!-- Интерфейс ПК -->
     <div id="pc-ui">
-        <div id="qrcode"></div>
+        <div id="qrcode">⏳ Соединение с сервером...</div>
         <h1>Отсканируйте код</h1>
         <p>Используйте камеру телефона для подключения</p>
     </div>
     <div id="status">● Подключено (WebRTC P2P)</div>
 
-    <!-- Интерфейс Телефона -->
     <div id="phone-ui">
         <button class="btn" id="start-btn">Подключить гироскоп</button>
-        <div id="phone-status">Ожидание нажатия...</div>
+        <div id="phone-status">Ожидание...</div>
     </div>
 
     <script>
@@ -127,20 +111,17 @@
         const peerIdToConnect = urlParams.get('peer');
         const isPhone = peerIdToConnect !== null;
 
-        // Инициализация PeerJS
-        const peer = new Peer();
+        // Создаем соединение (используем надежный бесплатный сервер по умолчанию)
+        const peer = new Peer({
+            debug: 2
+        });
 
         if (!isPhone) {
-            // ================= РЕЖИМ ПК =================
-
             let cube, scene, camera, renderer;
             let targetQuaternion = new THREE.Quaternion();
 
-            // Создаем 3D сцену (премиальный вид)
             function init3D() {
                 scene = new THREE.Scene();
-                scene.fog = new THREE.FogExp2(0x050507, 0.05);
-
                 camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
                 camera.position.z = 6;
 
@@ -149,28 +130,17 @@
                 renderer.setPixelRatio(window.devicePixelRatio);
                 document.body.appendChild(renderer.domElement);
 
-                // Создаем "дорогой" материал
                 const geometry = new THREE.BoxGeometry(2, 2, 2);
-                
-                // Добавляем фаски (скругления), чтобы не было рыхло, используем стандартный куб, 
-                // но с крутым физическим материалом, отражающим свет
                 const material = new THREE.MeshPhysicalMaterial({
-                    color: 0x111111,
-                    metalness: 0.9,
-                    roughness: 0.1,
-                    clearcoat: 1.0,
-                    clearcoatRoughness: 0.1,
-                    emissive: 0x00ffaa,
-                    emissiveIntensity: 0.05
+                    color: 0x111111, metalness: 0.9, roughness: 0.1, 
+                    clearcoat: 1.0, emissive: 0x00ffaa, emissiveIntensity: 0.1
                 });
 
                 cube = new THREE.Mesh(geometry, material);
                 scene.add(cube);
 
-                // Крутой свет
-                const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-                scene.add(ambientLight);
-
+                scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+                
                 const light1 = new THREE.PointLight(0x00ffaa, 2, 50);
                 light1.position.set(5, 5, 5);
                 scene.add(light1);
@@ -179,7 +149,6 @@
                 light2.position.set(-5, -5, 5);
                 scene.add(light2);
 
-                // Декоративная сетка на фоне
                 const grid = new THREE.GridHelper(20, 20, 0x00ffaa, 0x222222);
                 grid.position.y = -2;
                 grid.material.opacity = 0.2;
@@ -189,17 +158,12 @@
                 animate();
             }
 
-            // Плавная анимация
             function animate() {
                 requestAnimationFrame(animate);
-                // Slerp обеспечивает ту самую киношную плавность движений
-                if (cube) {
-                    cube.quaternion.slerp(targetQuaternion, 0.15); 
-                }
+                if (cube) cube.quaternion.slerp(targetQuaternion, 0.15); 
                 renderer.render(scene, camera);
             }
 
-            // Настройка окна при ресайзе
             window.addEventListener('resize', () => {
                 if(camera && renderer) {
                     camera.aspect = window.innerWidth / window.innerHeight;
@@ -208,24 +172,34 @@
                 }
             });
 
-            // Когда ПК получил свой ID
-            peer.on('open', (id) => {
-                const connectUrl = window.location.href.split('?')[0] + '?peer=' + id;
-                
-                // Рисуем QR-код
-                new QRCode(document.getElementById("qrcode"), {
-                    text: connectUrl,
-                    width: 200,
-                    height: 200,
-                    colorDark : "#000000",
-                    colorLight : "#ffffff",
-                    correctLevel : QRCode.CorrectLevel.H
-                });
+            const qrcodeEl = document.getElementById("qrcode");
 
-                init3D();
+            // ОШИБКА СЕРВЕРА
+            peer.on('error', (err) => {
+                console.error(err);
+                qrcodeEl.innerHTML = `<span style="color: red; text-align: center;">Ошибка сети!<br>Попробуй выключить AdBlock или обновить страницу.</span>`;
             });
 
-            // Когда телефон подключился к ПК
+            // УСПЕШНОЕ ПОДКЛЮЧЕНИЕ
+            peer.on('open', (id) => {
+                qrcodeEl.innerHTML = ""; // Убираем текст загрузки
+                const connectUrl = window.location.href.split('?')[0] + '?peer=' + id;
+                
+                try {
+                    new QRCode(qrcodeEl, {
+                        text: connectUrl,
+                        width: 200,
+                        height: 200,
+                        colorDark : "#000000",
+                        colorLight : "#ffffff",
+                        correctLevel : QRCode.CorrectLevel.H
+                    });
+                    init3D();
+                } catch(e) {
+                    qrcodeEl.innerHTML = `<span style="color: red;">Ошибка QR-генератора!</span>`;
+                }
+            });
+
             peer.on('connection', (conn) => {
                 conn.on('open', () => {
                     document.getElementById('pc-ui').style.opacity = '0';
@@ -233,15 +207,11 @@
                     document.getElementById('status').style.display = 'block';
                 });
 
-                // Получаем данные с гироскопа телефона с нулевой задержкой
                 conn.on('data', (data) => {
                     if (data.type === 'gyro') {
-                        // Переводим градусы в радианы и учитываем оси
                         const alpha = THREE.MathUtils.degToRad(data.alpha || 0);
                         const beta = THREE.MathUtils.degToRad(data.beta || 0);
                         const gamma = THREE.MathUtils.degToRad(data.gamma || 0);
-
-                        // Установка осей для 3D
                         const euler = new THREE.Euler(beta, alpha, -gamma, 'YXZ');
                         targetQuaternion.setFromEuler(euler);
                     }
@@ -249,17 +219,19 @@
             });
 
         } else {
-            // ================= РЕЖИМ ТЕЛЕФОНА =================
-
             document.getElementById('phone-ui').style.display = 'flex';
             const statusEl = document.getElementById('phone-status');
             const btn = document.getElementById('start-btn');
             
             let conn;
 
+            peer.on('error', (err) => {
+                statusEl.innerText = "Ошибка подключения к ПК!";
+                statusEl.style.color = "red";
+            });
+
             peer.on('open', () => {
                 statusEl.innerText = "Установка связи P2P...";
-                // Подключаемся к ПК
                 conn = peer.connect(peerIdToConnect);
 
                 conn.on('open', () => {
@@ -268,19 +240,14 @@
             });
 
             btn.addEventListener('click', () => {
-                // Запрос разрешений для iOS 13+ (Обязательно по клику)
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                     DeviceOrientationEvent.requestPermission()
                         .then(permissionState => {
-                            if (permissionState === 'granted') {
-                                startGyro();
-                            } else {
-                                statusEl.innerText = "Доступ к гироскопу запрещен.";
-                            }
+                            if (permissionState === 'granted') startGyro();
+                            else statusEl.innerText = "Доступ к гироскопу запрещен.";
                         })
                         .catch(console.error);
                 } else {
-                    // Для Android и старых iOS
                     startGyro();
                 }
             });
@@ -289,17 +256,14 @@
                 btn.style.display = 'none';
                 statusEl.innerText = "🔴 Идет передача движений...";
                 statusEl.style.color = "#00ffaa";
-                statusEl.style.fontSize = "20px";
-                statusEl.style.fontWeight = "bold";
 
                 window.addEventListener('deviceorientation', (event) => {
                     if (conn && conn.open) {
-                        // Отправляем данные прямо в дата-канал (минимальная задержка)
                         conn.send({
                             type: 'gyro',
-                            alpha: event.alpha, // поворот вокруг Z
-                            beta: event.beta,   // наклон вперед/назад
-                            gamma: event.gamma  // наклон влево/вправо
+                            alpha: event.alpha,
+                            beta: event.beta,
+                            gamma: event.gamma
                         });
                     }
                 }, true);
